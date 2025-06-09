@@ -1,0 +1,77 @@
+# Use a modern version of the Docker Compose file format.
+version: '3.8'
+
+# Define the services (containers) that make up our application.
+services:
+  # The PHP application service
+  app:
+    build:
+      # Use the Dockerfile in the current directory.
+      context: .
+      # Specify which stage from our multi-stage Dockerfile to build.
+      # We use 'development' for local work, which includes Xdebug.
+      target: development
+    container_name: php_app_shopping_list
+    # The 'volumes' directive mounts our local source code into the container.
+    # This allows changes we make on our machine to be reflected instantly
+    # inside the container without needing to rebuild the image.
+    volumes:
+      - ./:/var/www/html
+    # Define environment variables for the container.
+    # In a real project, these would come from a .env file.
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=shopping_list
+      - DB_USERNAME=user
+      - DB_PASSWORD=password
+    networks:
+      - app-network
+
+  # The Nginx web server service
+  webserver:
+    image: nginx:1.25-alpine
+    container_name: webserver_shopping_list
+    ports:
+      # Map port 8080 on our local machine to port 80 inside the container.
+      # We'll access the app at http://localhost:8080
+      - "8080:80"
+    volumes:
+      # Mount our application code so Nginx can serve static files.
+      - ./:/var/www/html
+      # Mount our custom Nginx configuration file.
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      # Ensure the 'app' service is started before the 'webserver' service.
+      - app
+    networks:
+      - app-network
+
+  # The MySQL database service
+  db:
+    image: mysql:8.0
+    container_name: db_shopping_list
+    ports:
+      # Map port 33066 on our local machine to port 3306 in the container.
+      # This avoids conflicts with any locally installed MySQL server.
+      - "33066:3306"
+    environment:
+      MYSQL_DATABASE: shopping_list
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: rootpassword
+    volumes:
+      # Use a named volume to persist database data across container restarts.
+      - db-data:/var/lib/mysql
+    networks:
+      - app-network
+
+# Define the networks our services will use to communicate.
+networks:
+  app-network:
+    driver: bridge
+
+# Define the named volumes for persistent data storage.
+volumes:
+  db-data:
+    driver: local
