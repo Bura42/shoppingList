@@ -1,0 +1,3 @@
+# Force Git to use LF line endings for all text files.
+# This prevents issues when moving between Windows and Unix-based systems.
+* text=auto eol=lf

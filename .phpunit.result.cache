@@ -1,0 +1,1 @@
+{"version":1,"defects":[],"times":{"Tests\\Unit\\ItemTest::test_it_can_be_instantiated_with_properties":0.01,"Tests\\Feature\\RouterTest::test_it_resolves_a_basic_get_route":0.019,"Tests\\Feature\\RouterTest::test_it_resolves_a_dynamic_route_with_parameters":0}}

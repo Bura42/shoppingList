@@ -11,6 +11,9 @@ services:
       # Specify which stage from our multi-stage Dockerfile to build.
       # We use 'development' for local work, which includes Xdebug.
       target: development
+      # ADDED: This tells Docker Compose not to substitute the variable itself.
+      args:
+        - PHPIZE_DEPS
     container_name: php_app_shopping_list
     # The 'volumes' directive mounts our local source code into the container.
     # This allows changes we make on our machine to be reflected instantly
