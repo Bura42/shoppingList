@@ -1,12 +1,17 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Core;
 
+use ReflectionMethod;
+
+/**
+ * The Router class resolves a request to a specific controller action.
+ * This version uses a more robust strategy by separating static and dynamic routes.
+ */
 class Router
 {
-    protected array $routes = [];
+    protected array $staticRoutes = [];
+    protected array $dynamicRoutes = [];
     protected Request $request;
 
     public function __construct(Request $request)
@@ -26,7 +31,19 @@ class Router
 
     protected function addRoute(string $method, string $path, array $handler): void
     {
-        $this->routes[$method][$path] = $handler;
+        if ($path !== '/') {
+            $path = rtrim($path, '/');
+        }
+        if (str_contains($path, '{')) {
+            $pattern = preg_replace('/\{([a-zA-Z0-9_]+)\}/', '(?P<$1>\d+)', $path);
+            $pattern = '#^' . $pattern . '$#';
+            $this->dynamicRoutes[$method][] = [
+                'pattern' => $pattern,
+                'handler' => $handler,
+            ];
+        } else {
+            $this->staticRoutes[$method][$path] = $handler;
+        }
     }
 
     public function resolve()
@@ -34,19 +51,20 @@ class Router
         $path = $this->request->getPath();
         $method = $this->request->getMethod();
 
-        $handler = $this->routes[$method][$path] ?? null;
-        $params = [];
+        if ($path !== '/') {
+            $path = rtrim($path, '/');
+        }
 
-        if ($handler === null) {
-            foreach ($this->routes[$method] as $routePath => $routeHandler) {
-                $routePath = preg_replace('/\{([a-zA-Z0-9_]+)\}/', '(?P<$1>[0-9]+)', $routePath);
-                $routePath = '#^' . $routePath . '$#';
+        $handler = $this->staticRoutes[$method][$path] ?? null;
+        $routeParams = [];
 
-                if (preg_match($routePath, $path, $matches)) {
-                    $handler = $routeHandler;
+        if ($handler === null && isset($this->dynamicRoutes[$method])) {
+            foreach ($this->dynamicRoutes[$method] as $route) {
+                if (preg_match($route['pattern'], $path, $matches)) {
+                    $handler = $route['handler'];
                     foreach ($matches as $key => $value) {
                         if (is_string($key)) {
-                            $params[$key] = (int)$value;
+                            $routeParams[$key] = $value;
                         }
                     }
                     break;
@@ -60,14 +78,23 @@ class Router
             return;
         }
 
-        [$controllerClass, $method] = $handler;
-
-        if (!class_exists($controllerClass) || !method_exists($controllerClass, $method)) {
-            echo "500 - Server Error";
-            return;
-        }
+        [$controllerClass, $methodName] = $handler;
 
         $controller = new $controllerClass();
-        call_user_func_array([$controller, $method], [$this->request, ...array_values($params)]);
+        $reflectionMethod = new ReflectionMethod($controller, $methodName);
+
+        $args = [];
+        foreach ($reflectionMethod->getParameters() as $param) {
+            $paramName = $param->getName();
+            $paramType = $param->getType();
+
+            if ($paramType && $paramType->getName() === Request::class) {
+                $args[] = $this->request;
+            } elseif (isset($routeParams[$paramName])) {
+                $args[] = $routeParams[$paramName];
+            }
+        }
+
+        call_user_func_array([$controller, $methodName], $args);
     }
 }

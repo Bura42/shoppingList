@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controllers;
 
 use App\Core\Request;
@@ -35,6 +37,48 @@ class ItemController
         if (!empty($itemName)) {
             $item = new Item();
             $item->name = $itemName;
+            $this->itemRepository->save($item);
+        }
+
+        header('Location: /items');
+        exit;
+    }
+
+    /**
+     * Shows the form to edit an existing item.
+     * Note the type hint (int) for the id from the URL.
+     */
+    public function edit(int $id): void
+    {
+        $item = $this->itemRepository->findById($id);
+
+        if (!$item) {
+            http_response_code(404);
+            echo "404 - Item not found.";
+            exit;
+        }
+
+        require __DIR__ . '/../Views/items/edit.phtml';
+    }
+
+    /**
+     * Handles the form submission for updating an item.
+     */
+    public function update(Request $request, int $id): void
+    {
+        $item = $this->itemRepository->findById($id);
+
+        if (!$item) {
+            http_response_code(404);
+            echo "404 - Item not found.";
+            exit;
+        }
+
+        $data = $request->getBody();
+        $newName = trim($data['name'] ?? '');
+
+        if (!empty($newName)) {
+            $item->name = $newName;
             $this->itemRepository->save($item);
         }
 
